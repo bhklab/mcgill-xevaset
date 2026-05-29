@@ -1,0 +1,511 @@
+---
+title: "Exploring the McGill XevaSet with Xeva"
+date: "`r format(Sys.Date(), '%Y-%m-%d')`"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    mathjax: null
+---
+
+This document introduces the curated McGill breast cancer PDX `XevaSet` using the
+`Xeva` R package and the exported pipeline tables.
+
+## Setup
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = FALSE,
+  message = FALSE,
+  warning = FALSE,
+  fig.width = 8,
+  fig.height = 5
+)
+
+suppressPackageStartupMessages({
+  library(Biobase)
+  library(data.table)
+  library(dplyr)
+  library(ggplot2)
+  library(knitr)
+  library(patchwork)
+  library(scales)
+  library(tidyr)
+  library(Xeva)
+})
+
+theme_set(theme_minimal(base_size = 12))
+
+data_path <- function(...) file.path("data", ...)
+```
+
+## Load The Dataset
+
+The curated object is stored as an `RDS` file in `data/results/`.
+
+```{r load-data}
+xeva_path <- data_path("results", "Xeva_McGill.rds")
+
+mcgill <- readRDS(xeva_path)
+mcgill
+```
+
+The `XevaSet` bundles model metadata, drug metadata, tumor growth
+measurements, response summaries, and molecular profiles into one object.
+
+```{r dataset-overview}
+model_df <- modelInfo(mcgill) |>
+  as_tibble()
+treatment_df <- mcgill@drug |>
+  as_tibble()
+batch_ids <- batchInfo(mcgill)
+model_metrics <- mcgill@sensitivity$model |>
+  as.data.frame(stringsAsFactors = FALSE)
+batch_metrics <- mcgill@sensitivity$batch |>
+  as.data.frame(stringsAsFactors = FALSE)
+manifest <- fread(data_path("results", "Xeva_McGill_csv", "file_manifest.csv"))
+mod_map <- fread(data_path("results", "Xeva_McGill_csv", "mod_to_biobase_map.csv"))
+example_experiment <- getExperiment(mcgill, model.id = model_df$model.id[[1]])
+
+overview_tbl <- tibble(
+  quantity = c(
+    "Model records",
+    "Patients",
+    "Treatment-control batches",
+    "Treatments including control",
+    "Tumor measurements",
+    "Molecular profile types"
+  ),
+  value = c(
+    nrow(model_df),
+    n_distinct(model_df$patient.id),
+    length(batch_ids),
+    n_distinct(treatment_df$drug.id),
+    manifest$rows[manifest$component == "experiment_measurements"],
+    length(mcgill@molecularProfiles)
+  )
+)
+
+kable(overview_tbl)
+```
+
+## What Is Included?
+
+```{r object-contents}
+contents_tbl <- tibble(
+  component = c(
+    "Model metadata",
+    "Treatment metadata",
+    "Individual growth curves",
+    "Model-level response summaries",
+    "Batch-level response summaries",
+    "Molecular profiles",
+    "CSV exports"
+  ),
+  rows_or_items = c(
+    nrow(model_df),
+    nrow(treatment_df),
+    length(mcgill@experiment),
+    nrow(model_metrics),
+    nrow(batch_metrics),
+    length(mcgill@molecularProfiles),
+    nrow(manifest)
+  ),
+  fields_or_summary = c(
+    paste(colnames(model_df), collapse = ", "),
+    paste(colnames(treatment_df), collapse = ", "),
+    paste(colnames(example_experiment), collapse = ", "),
+    paste(colnames(model_metrics), collapse = ", "),
+    paste(colnames(batch_metrics), collapse = ", "),
+    paste(names(mcgill@molecularProfiles), collapse = ", "),
+    paste(manifest$relative_path, collapse = ", ")
+  )
+)
+
+kable(contents_tbl)
+```
+
+```{r growth-curve-table-example}
+kable(head(example_experiment, 8))
+```
+
+## Workbook Parsing
+
+The treatment-response workbook is parsed into one model-level row per
+mouse-treatment arm and one measurement row per time point.
+
+```{r workbook-summary}
+block_summary <- fread(data_path(
+  "procdata", "metadata", "tumor_workbook_blocks.csv"
+))
+
+workbook_summary <- block_summary |>
+  summarise(
+    patients = n_distinct(patient.id),
+    model_records = n(),
+    control_records = sum(drug == "untreated"),
+    treated_records = sum(drug != "untreated"),
+    min_time = min(min_time, na.rm = TRUE),
+    max_time = max(max_time, na.rm = TRUE)
+  )
+
+kable(workbook_summary)
+```
+
+```{r workbook-treatment-summary}
+workbook_treatment_summary <- block_summary |>
+  count(drug, name = "model_records") |>
+  arrange(desc(model_records), drug)
+
+kable(workbook_treatment_summary)
+```
+
+```{r treatment-barplot, fig.height=4}
+ggplot(
+  workbook_treatment_summary,
+  aes(x = reorder(drug, model_records), y = model_records)
+) +
+  geom_col(fill = "#3b82b8") +
+  coord_flip() +
+  labs(
+    title = "Model records by treatment",
+    x = "Treatment",
+    y = "Model records"
+  )
+```
+
+## Model Metadata
+
+Each row in the model metadata represents one mouse-level model in a treatment
+context. Controls use `untreated` as the normalized drug label.
+
+```{r model-metadata-head}
+kable(head(model_df, 8))
+```
+
+Key metadata columns include:
+
+* `model.id`: unique mouse-treatment model identifier.
+* `patient.id`: patient-level `GCRC` identifier shared across related arms.
+* `drug`: normalized treatment name.
+* `source_treatment_name`: treatment label from the source workbook.
+* `source.dose` and `source.schedule`: workbook dose and schedule where
+  provided.
+* `RNAseq.PDX` and `WGS.PDX`: molecular sample identifiers from the crosswalk.
+
+```{r clinical-summary}
+clinical_columns <- c("ER", "PR", "HER2", "AIMS")
+
+clinical_summary <- model_df |>
+  distinct(patient.id, across(all_of(clinical_columns))) |>
+  pivot_longer(
+    cols = all_of(clinical_columns),
+    names_to = "field",
+    values_to = "value"
+  ) |>
+  mutate(value = if_else(is.na(value), "Not available", value)) |>
+  count(field, value, name = "patients") |>
+  arrange(field, desc(patients), value)
+
+kable(clinical_summary)
+```
+
+## Treatment Metadata
+
+Treatment metadata preserves the source treatment label and includes compact
+compound annotation fields where available.
+
+```{r treatment-metadata}
+kable(
+  treatment_df |>
+    select(
+      drug.id,
+      standard.name,
+      source_treatment_name,
+      treatment.type,
+      source.patient.count,
+      source.model.count,
+      annotationdb.match,
+      compound.name,
+      pubchem.cid,
+      molecular.formula,
+      smiles,
+      inchikey
+    )
+)
+```
+
+```{r unmatched-treatment-report}
+unmatched_treatments <- fread(data_path("results", "unmatched_treatments.csv"))
+
+kable(tibble(
+  report = "Unmatched treatments",
+  rows = nrow(unmatched_treatments)
+))
+```
+
+```{r unmatched-treatment-table}
+if (nrow(unmatched_treatments) > 0) {
+  kable(unmatched_treatments)
+} else {
+  kable(tibble(status = "All non-control treatments are matched."))
+}
+```
+
+## Molecular Profiles
+
+The molecular profiles are stored as `ExpressionSet` objects in the `XevaSet`.
+The matrix dimensions below are the feature-by-sample dimensions for each
+profile.
+
+```{r molecular-profile-dimensions}
+profile_summary <- lapply(
+  names(mcgill@molecularProfiles),
+  function(profile_name) {
+    profile <- mcgill@molecularProfiles[[profile_name]]
+    feature_data <- Biobase::fData(profile)
+    data.frame(
+      profile = profile_name,
+      features = nrow(exprs(profile)),
+      samples = ncol(exprs(profile)),
+      feature_id_example = rownames(exprs(profile))[[1]],
+      feature_metadata = paste(colnames(feature_data), collapse = ", "),
+      stringsAsFactors = FALSE
+    )
+  }
+) |>
+  bind_rows()
+
+kable(profile_summary)
+```
+
+Gene-level molecular profiles are annotated with metadata from the current
+GENCODE release tracked by AnnotationGx. RNAseq retains the original Ensembl
+feature identifier,
+mutation and copy-number profiles retain their source gene-symbol feature
+labels, and fusion profiles retain fusion-pair features with separate GENCODE
+annotation for the left and right genes. Segment profiles remain genomic
+interval features.
+
+```{r unmapped-genes}
+unmapped_genes_path <- data_path("results", "unmapped_genes.csv")
+if (file.exists(unmapped_genes_path)) {
+  unmapped_genes <- fread(unmapped_genes_path)
+  if (nrow(unmapped_genes) > 0) {
+    unmapped_genes |>
+      count(profile, feature_column, name = "unmapped_features") |>
+      arrange(desc(unmapped_features)) |>
+      kable()
+  } else {
+    kable(tibble(status = "All gene-level molecular features are mapped."))
+  }
+} else {
+  kable(tibble(status = "Unmapped gene report has not been generated yet."))
+}
+```
+
+The model-to-molecular map links model records to patient or PDX molecular
+samples. A model can map to both patient and PDX molecular samples for the same
+profile type.
+
+```{r molecular-map-coverage}
+map_by_datatype <- mod_map |>
+  distinct(model.id, biobase.id, source, mDataType) |>
+  count(mDataType, source, name = "mappings") |>
+  arrange(mDataType, source)
+
+kable(map_by_datatype)
+```
+
+```{r molecular-model-coverage}
+model_coverage <- mod_map |>
+  distinct(model.id, mDataType) |>
+  count(mDataType, name = "mapped_model_records") |>
+  arrange(mDataType)
+
+case_coverage <- model_df |>
+  transmute(
+    patient.id,
+    RNAseq.PDX = !is.na(RNAseq.PDX),
+    WGS.PDX = !is.na(WGS.PDX)
+  ) |>
+  distinct() |>
+  summarise(
+    patients = n_distinct(patient.id),
+    patients_with_rnaseq_pdx = sum(RNAseq.PDX, na.rm = TRUE),
+    patients_with_wgs_pdx = sum(WGS.PDX, na.rm = TRUE)
+  )
+
+kable(model_coverage)
+kable(case_coverage)
+```
+
+## Response Summaries
+
+The pipeline computes model-level and batch-level response metrics using the
+`Xeva` package.
+
+```{r model-response-availability}
+model_metric_summary <- tibble(
+  metric = colnames(model_metrics)[colnames(model_metrics) != "model.id"],
+  available_models = colSums(!is.na(model_metrics[
+    colnames(model_metrics) != "model.id"
+  ])),
+  pct_models = round(100 * colMeans(!is.na(model_metrics[
+    colnames(model_metrics) != "model.id"
+  ])), 1)
+)
+
+kable(model_metric_summary)
+```
+
+```{r batch-response-availability}
+batch_metric_summary <- tibble(
+  metric = colnames(batch_metrics)[colnames(batch_metrics) != "batch.name"],
+  available_batches = colSums(!is.na(batch_metrics[
+    colnames(batch_metrics) != "batch.name"
+  ])),
+  pct_batches = round(100 * colMeans(!is.na(batch_metrics[
+    colnames(batch_metrics) != "batch.name"
+  ])), 1)
+)
+
+kable(batch_metric_summary)
+```
+
+### Response Metric Distributions
+
+```{r response-distributions, fig.height=6}
+auc_df <- model_metrics |>
+  select(AUC) |>
+  filter(!is.na(AUC), AUC > 0)
+
+slope_df <- model_metrics |>
+  select(slope) |>
+  filter(!is.na(slope), between(slope, -90, 90))
+
+bar_df <- model_metrics |>
+  select(best.average.response) |>
+  filter(!is.na(best.average.response))
+
+base_hist_theme <- theme_minimal(base_size = 12) +
+  theme(
+    panel.grid.minor = element_blank(),
+    plot.title = element_text(face = "bold", size = 12),
+    axis.title.x = element_text(size = 11),
+    axis.title.y = element_text(size = 11)
+  )
+
+p_auc <- ggplot(auc_df, aes(x = AUC)) +
+  geom_histogram(bins = 30, fill = "#3b82b8", color = "white") +
+  scale_x_continuous(labels = label_number(big.mark = ",")) +
+  labs(title = "AUC", x = "AUC", y = "Models") +
+  base_hist_theme
+
+p_slope <- ggplot(slope_df, aes(x = slope)) +
+  geom_histogram(bins = 30, fill = "#3b82b8", color = "white") +
+  labs(title = "Slope", x = "Angle (degrees)", y = "Models") +
+  base_hist_theme
+
+p_bar <- ggplot(bar_df, aes(x = best.average.response)) +
+  geom_histogram(bins = 30, fill = "#3b82b8", color = "white") +
+  labs(
+    title = "Best Average Response",
+    x = "Percent change from baseline",
+    y = "Models"
+  ) +
+  base_hist_theme
+
+(p_auc + p_slope + p_bar) +
+  plot_layout(ncol = 3)
+```
+
+`AUC`, `slope`, and `best.average.response` summarize different aspects of
+tumor growth. Lower `best.average.response` values indicate stronger inhibition
+or shrinkage relative to baseline.
+
+## mRECIST Summary
+
+The `mRECIST` matrix summarizes response by treatment and patient.
+
+```{r mrecist-table}
+mrecist_matrix <- summarizeResponse(
+  mcgill,
+  response.measure = "mRECIST",
+  group.by = "patient.id",
+  tissue = "Breast Cancer"
+)
+
+dim(mrecist_matrix)
+```
+
+```{r mrecist-preview}
+kable(
+  mrecist_matrix[seq_len(min(8, nrow(mrecist_matrix))),
+    seq_len(min(8, ncol(mrecist_matrix))),
+    drop = FALSE
+  ]
+)
+```
+
+```{r mrecist-plot, fig.width=11, fig.height=6}
+plotmRECIST(
+  mrecist_matrix,
+  control.name = "untreated",
+  name = "Breast cancer",
+  sort = FALSE
+)
+```
+
+## Example Growth Curves
+
+The batch-level plot pairs a treatment arm with its control arm for the same
+patient.
+
+```{r batch-example}
+sample_batch <- batch_ids[grepl("Cisplatin", batch_ids)][[1]]
+batch_info <- batchInfo(mcgill, batch = sample_batch)[[1]]
+
+kable(tibble(
+  field = c("Batch", "Control arm", "Treatment arm"),
+  value = c(batch_info$batch.name, batch_info$control, batch_info$treatment)
+))
+```
+
+```{r plot-batch-growth, fig.height=5}
+plotPDX(
+  mcgill,
+  batch = sample_batch,
+  vol.normal = TRUE,
+  max.time = 30
+)
+```
+
+## Waterfall Plot
+
+Waterfall plots rank models from strongest response to weakest response for a
+given treatment.
+
+```{r waterfall-drug}
+waterfall_drug <- model_df |>
+  filter(drug != "untreated") |>
+  count(drug, sort = TRUE) |>
+  slice(1) |>
+  pull(drug)
+
+waterfall_drug
+```
+
+```{r waterfall-plot, fig.width=10, fig.height=5}
+waterfall(
+  mcgill,
+  drug = waterfall_drug,
+  res.measure = "best.average.response"
+)
+```
+
+## Session Info
+
+```{r session-info}
+sessionInfo()
+```

@@ -1,0 +1,49 @@
+dataset:
+  name: "McGill Breast Cancer PDX"
+  short_name: "McGill"
+
+directories:
+  rawdata: data/rawdata
+  procdata: data/procdata
+  results: data/results
+  logs: logs
+
+raw_inputs:
+  tumor_workbook: "McGill - Park lab/Park_Lab_Updated_Files/GCRC_PDX_1x1x1_Trial_BHK_April_2024.xlsx"
+  clinical_info: "McGill - Park lab/Park_Lab_Updated_Files/Morag_Park_clinical_info_April_2024.xlsx"
+  sample_crosswalk: "McGill - Park lab/All files_Arvind_3Apr2024/Data/RNASeq/MP_RNASeq/SA_GCRC_ID.xlsx"
+  rnaseq: "McGill - Park lab/All files_Arvind_3Apr2024/Data/RNASeq/MP_RNASeq/pdxMorag_rnaseq.rda"
+  mutation: "McGill - Park lab/All files_Arvind_3Apr2024/Data/cbioportal_import_data/data_mutations_extended.txt"
+  cnv: "McGill - Park lab/All files_Arvind_3Apr2024/Data/cbioportal_import_data/data_CNA.txt"
+  log_cnv: "McGill - Park lab/All files_Arvind_3Apr2024/Data/cbioportal_import_data/data_log2CNA.txt"
+  fusion: "McGill - Park lab/All files_Arvind_3Apr2024/Data/cbioportal_import_data/data_fusions.txt"
+  segments: "McGill - Park lab/All files_Arvind_3Apr2024/Data/cbioportal_import_data/data_segments.txt"
+
+workbook:
+  ignored_sheets: ["Sheet6"]
+  source_control_label: "Control"
+  control_drug: "untreated"
+
+metadata:
+  tissue_id: BRCA
+  tissue: "Breast Cancer"
+  tissue_name: "Breast Cancer"
+  oncotree_code: BREAST
+  oncotree_name: "Breast"
+  oncotree_main_type: "Breast Cancer"
+
+annotationdb:
+  base_url: "https://v2annotationdb.bhklab.ca"
+  compound_many_path: "/compound/many"
+
+annotationgx:
+  gencode:
+    species: homo_sapiens
+    id_batch_size: 1000
+    request_timeout_seconds: 120
+    symbol_fallback: true
+
+response:
+  metrics: ["mRECIST", "slope", "AUC", "angle", "abc", "TGI"]
+  min_time: 10
+  max_time: 30
