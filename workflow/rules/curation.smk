@@ -95,21 +95,6 @@ rule make_CNV_SE:
         scripts / "make_CNV_SE.R"
 
 
-rule make_logCNV_SE:
-    input:
-        cnv=rawdata / raw_inputs["log_cnv"],
-        crosswalk=rawdata / raw_inputs["sample_crosswalk"],
-    output:
-        se=procdata / "logcnv" / "logCNV_SE.rds",
-        matrix=procdata / "logcnv" / "logCNV_expression.csv",
-    log:
-        logs / "make_logCNV_SE.log",
-    params:
-        datatype="logCNV",
-    script:
-        scripts / "make_CNV_SE.R"
-
-
 rule make_Fusion_SE:
     input:
         fusion=rawdata / raw_inputs["fusion"],
@@ -141,14 +126,12 @@ rule annotate_gene_metadata:
         rnaseq=rules.make_RNASeq_SE.output.se,
         mutation=rules.make_Mutation_SE.output.se,
         cnv=rules.make_CNV_SE.output.se,
-        logcnv=rules.make_logCNV_SE.output.se,
         fusion=rules.make_Fusion_SE.output.se,
         segments=rules.make_Segment_SE.output.se,
     output:
         rnaseq=procdata / "gene_annotation" / "RNAseq_SE.rds",
         mutation=procdata / "gene_annotation" / "Mutation_SE.rds",
         cnv=procdata / "gene_annotation" / "CNV_SE.rds",
-        logcnv=procdata / "gene_annotation" / "logCNV_SE.rds",
         fusion=procdata / "gene_annotation" / "Fusion_SE.rds",
         segments=procdata / "gene_annotation" / "Segment_SE.rds",
         unmapped=results / "unmapped_genes.csv",
@@ -164,7 +147,6 @@ rule build_modToBiobaseMap:
         rnaseq=rules.annotate_gene_metadata.output.rnaseq,
         mutation=rules.annotate_gene_metadata.output.mutation,
         cnv=rules.annotate_gene_metadata.output.cnv,
-        logcnv=rules.annotate_gene_metadata.output.logcnv,
         fusion=rules.annotate_gene_metadata.output.fusion,
         segments=rules.annotate_gene_metadata.output.segments,
     output:
@@ -193,7 +175,6 @@ rule build_MultiAssayExperiment:
             rules.annotate_gene_metadata.output.rnaseq,
             rules.annotate_gene_metadata.output.mutation,
             rules.annotate_gene_metadata.output.cnv,
-            rules.annotate_gene_metadata.output.logcnv,
             rules.annotate_gene_metadata.output.fusion,
             rules.annotate_gene_metadata.output.segments,
         ],

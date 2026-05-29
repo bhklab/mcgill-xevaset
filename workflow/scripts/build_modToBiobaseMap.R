@@ -37,7 +37,6 @@ mapping_df <- bind_rows(
   extract_mapping(snk$input$rnaseq),
   extract_mapping(snk$input$mutation),
   extract_mapping(snk$input$cnv),
-  extract_mapping(snk$input$logcnv),
   extract_mapping(snk$input$fusion),
   extract_mapping(snk$input$segments)
 ) |>

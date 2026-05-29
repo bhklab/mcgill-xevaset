@@ -353,7 +353,6 @@ ses <- list(
   RNAseq = readRDS(snk$input$rnaseq),
   mutation = readRDS(snk$input$mutation),
   CNV = readRDS(snk$input$cnv),
-  logCNV = readRDS(snk$input$logcnv),
   fusion = readRDS(snk$input$fusion),
   segments = readRDS(snk$input$segments)
 )
@@ -370,8 +369,7 @@ rna_queries <- build_feature_queries(
 
 gene_profiles <- list(
   mutation = list(se = ses$mutation, feature_col = "gene"),
-  CNV = list(se = ses$CNV, feature_col = "gene"),
-  logCNV = list(se = ses$logCNV, feature_col = "gene")
+  CNV = list(se = ses$CNV, feature_col = "gene")
 )
 gene_queries <- lapply(names(gene_profiles), function(profile_name) {
   row_df <- as.data.frame(

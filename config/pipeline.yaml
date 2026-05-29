@@ -15,7 +15,6 @@ raw_inputs:
   rnaseq: "McGill - Park lab/All files_Arvind_3Apr2024/Data/RNASeq/MP_RNASeq/pdxMorag_rnaseq.rda"
   mutation: "McGill - Park lab/All files_Arvind_3Apr2024/Data/cbioportal_import_data/data_mutations_extended.txt"
   cnv: "McGill - Park lab/All files_Arvind_3Apr2024/Data/cbioportal_import_data/data_CNA.txt"
-  log_cnv: "McGill - Park lab/All files_Arvind_3Apr2024/Data/cbioportal_import_data/data_log2CNA.txt"
   fusion: "McGill - Park lab/All files_Arvind_3Apr2024/Data/cbioportal_import_data/data_fusions.txt"
   segments: "McGill - Park lab/All files_Arvind_3Apr2024/Data/cbioportal_import_data/data_segments.txt"
 

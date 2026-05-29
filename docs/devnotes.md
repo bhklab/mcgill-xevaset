@@ -3,7 +3,7 @@
 ## Scope Decisions
 
 - The configured workbook in `config/pipeline.yaml` is the treatment-response source of truth.
-- The curation includes RNAseq, mutation, CNV, logCNV, fusion, and segment molecular profiles. Segment-level copy number data is stored as a matrix-style `SummarizedExperiment` so it can move through the current `XevaSet` and CSV export path.
+- The curation includes RNAseq, mutation, CNV, fusion, and segment molecular profiles. The log2 CNA matrix is not retained as a separate molecular profile because the discrete CNV profile covers the copy-number layer for this `XevaSet`. Segment-level copy number data is stored as a matrix-style `SummarizedExperiment` so it can move through the current `XevaSet` and CSV export path.
 
 ## Directory Decisions
 
