@@ -19,7 +19,7 @@
 - Controls are normalized to `untreated` in curated tables while retaining source labels in provenance columns.
 - Molecular profiles map to models through patient-level `GCRC` IDs from `SA_GCRC_ID.xlsx` and clinical metadata.
 - WGS-derived molecular profiles use WGS sample columns from `SA_GCRC_ID.xlsx`, with RNAseq sample columns as a fallback for samples present in cbioportal files but absent from the WGS columns.
-- Gene-level molecular feature metadata is rebuilt from the current GENCODE release tracked by AnnotationGx instead of carrying older source gene annotations forward. RNAseq keeps the original Ensembl feature ID as provenance, while GENCODE fields supply the current gene symbol, biotype, coordinates, and release metadata. AnnotationGx direct gene helpers are available, but currently make one request per feature; the pipeline uses batched current-GENCODE lookups for runtime practicality.
+- Gene-level molecular feature metadata is rebuilt from the current GENCODE release instead of carrying older source gene annotations forward. RNAseq keeps the original Ensembl feature ID as provenance, while GENCODE fields supply the current gene symbol, biotype, coordinates, and release metadata. The pipeline uses batched current-GENCODE lookups for runtime practicality.
 
 ## Metadata Decisions
 

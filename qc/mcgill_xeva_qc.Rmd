@@ -280,12 +280,86 @@ kable(profile_summary)
 ```
 
 Gene-level molecular profiles are annotated with metadata from the current
-GENCODE release tracked by AnnotationGx. RNAseq retains the original Ensembl
-feature identifier,
-mutation and copy-number profiles retain their source gene-symbol feature
-labels, and fusion profiles retain fusion-pair features with separate GENCODE
-annotation for the left and right genes. Segment profiles remain genomic
-interval features.
+GENCODE release used by the pipeline. RNAseq retains the original Ensembl
+feature identifier, mutation and copy-number profiles retain their source
+gene-symbol feature labels, and fusion profiles retain fusion-pair features
+with separate GENCODE annotation for the left and right genes. Segment profiles
+remain genomic interval features.
+
+```{r molecular-feature-annotation}
+gene_feature_summary <- lapply(
+  names(mcgill@molecularProfiles),
+  function(profile_name) {
+    profile <- mcgill@molecularProfiles[[profile_name]]
+    feature_data <- Biobase::fData(profile) |>
+      as_tibble()
+
+    if ("gencode.mapped" %in% colnames(feature_data)) {
+      mapped <- feature_data$gencode.mapped
+      if (!is.logical(mapped)) {
+        mapped <- as.character(mapped) == "TRUE"
+      }
+
+      return(tibble(
+        profile = profile_name,
+        feature_set = "feature",
+        features = nrow(feature_data),
+        mapped_features = sum(mapped, na.rm = TRUE),
+        unmapped_features = sum(!mapped, na.rm = TRUE),
+        mapped_fraction = mapped_features / features,
+        gencode_release = paste(
+          sort(unique(na.omit(feature_data$gencode.release))),
+          collapse = ", "
+        ),
+        example_gencode_symbol = dplyr::first(
+          na.omit(feature_data$gencode.symbol)
+        )
+      ))
+    }
+
+    if (
+      all(c(
+        "gencode.left.mapped",
+        "gencode.right.mapped"
+      ) %in% colnames(feature_data))
+    ) {
+      bind_rows(
+        lapply(c("left", "right"), function(side) {
+          mapped <- feature_data[[paste0("gencode.", side, ".mapped")]]
+          if (!is.logical(mapped)) {
+            mapped <- as.character(mapped) == "TRUE"
+          }
+
+          tibble(
+            profile = profile_name,
+            feature_set = paste0(side, "_gene"),
+            features = nrow(feature_data),
+            mapped_features = sum(mapped, na.rm = TRUE),
+            unmapped_features = sum(!mapped, na.rm = TRUE),
+            mapped_fraction = mapped_features / features,
+            gencode_release = paste(
+              sort(unique(na.omit(feature_data[[paste0(
+                "gencode.",
+                side,
+                ".release"
+              )]]))),
+              collapse = ", "
+            ),
+            example_gencode_symbol = dplyr::first(
+              na.omit(feature_data[[paste0("gencode.", side, ".symbol")]])
+            )
+          )
+        })
+      )
+    } else {
+      NULL
+    }
+  }
+) |>
+  bind_rows()
+
+kable(gene_feature_summary)
+```
 
 ```{r unmapped-genes}
 unmapped_genes_path <- data_path("results", "unmapped_genes.csv")

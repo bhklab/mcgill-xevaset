@@ -7,7 +7,6 @@ suppressPackageStartupMessages({
   library(jsonlite)
   library(S4Vectors)
   library(SummarizedExperiment)
-  library(AnnotationGx)
 })
 
 gencode_cfg <- snk$config$annotationgx$gencode
@@ -16,7 +15,26 @@ id_batch_size <- as.integer(gencode_cfg$id_batch_size)
 request_timeout_seconds <- as.integer(gencode_cfg$request_timeout_seconds)
 symbol_fallback <- isTRUE(gencode_cfg$symbol_fallback)
 
-release_info <- AnnotationGx::getGencodeCurrentReleaseInfo(species = species)
+get_current_release_info <- function(species) {
+  response <- httr::GET(
+    "https://rest.ensembl.org/info/data",
+    query = list("content-type" = "application/json"),
+    httr::accept_json(),
+    httr::timeout(request_timeout_seconds)
+  )
+  httr::stop_for_status(response)
+  payload <- jsonlite::fromJSON(
+    httr::content(response, as = "text", encoding = "UTF-8")
+  )
+
+  data.table(
+    species = species,
+    ensembl_release = as.integer(payload$releases[[1]]),
+    queried_at = as.character(Sys.time())
+  )
+}
+
+release_info <- get_current_release_info(species)
 ensembl_release <- release_info$ensembl_release[[1]]
 
 empty_gene_table <- function() {

@@ -4,7 +4,7 @@ This repository curates the McGill Park lab breast cancer PDX data into a `XevaS
 
 The workflow uses Snakemake for execution and pixi for package dependencies. Raw inputs are expected under `data/rawdata/`; the pipeline writes intermediates under `data/procdata/` and final outputs under `data/results/`.
 
-Gene-level molecular feature metadata is rebuilt against the current GENCODE release tracked by AnnotationGx, and unmapped features are reported in `data/results/unmapped_genes.csv`.
+Gene-level molecular feature metadata is rebuilt against the current GENCODE release used by the pipeline, and unmapped features are reported in `data/results/unmapped_genes.csv`.
 
 The Xeva dependency stack currently resolves on `linux-64` and `osx-64`. On Apple Silicon, Pixi falls back to the `osx-64` environment under Rosetta.
 
@@ -12,8 +12,11 @@ Run from the repository root:
 
 ```bash
 pixi install
+pixi run setup
 pixi run snakemake --cores <n>
 ```
+
+The setup task installs AnnotationGx from the remote `bhklab/AnnotationGx` repository. Set `ANNOTATIONGX_REF` only if a different remote ref should be used.
 
 Knit the QC report with:
 

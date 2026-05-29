@@ -25,8 +25,8 @@ The pipeline stores the final unmatched treatment report at `data/results/unmatc
 
 ## GENCODE Feature Annotation
 
-Gene-level molecular feature metadata is rebuilt from the current GENCODE release tracked by AnnotationGx. Species and lookup batch settings are configured under `annotationgx.gencode` in `config/pipeline.yaml`.
+Gene-level molecular feature metadata is rebuilt from the current GENCODE release used by the pipeline. Species and lookup batch settings are configured under `annotationgx.gencode` in `config/pipeline.yaml`.
 
-AnnotationGx provides direct GENCODE lookup helpers, but those helpers currently perform one request per feature. The pipeline uses batched current-GENCODE lookups for the feature tables so RNAseq, CNV, logCNV, mutation, and fusion annotations can be regenerated in a practical runtime while retaining AnnotationGx release metadata.
+The pipeline uses batched current-GENCODE lookups for the feature tables so RNAseq, CNV, logCNV, mutation, and fusion annotations can be regenerated in a practical runtime while storing the release used in feature metadata.
 
 The pipeline stores unmapped molecular features at `data/results/unmapped_genes.csv`.

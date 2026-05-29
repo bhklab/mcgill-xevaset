@@ -41,6 +41,8 @@ r-crayon = ">=1.5.3,<2"
 r-memoise = ">=2.0.1,<3"
 r-readr = ">=2.2.0,<3"
 r-xml2 = ">=1.5.2,<2"
+r-remotes = ">=2.5.0,<3"
 
 [tasks]
+setup = "Rscript -e \"ref <- Sys.getenv('ANNOTATIONGX_REF', 'v0.0.0.9097'); remotes::install_github(paste0('bhklab/AnnotationGx@', ref), upgrade = 'never')\""
 qc = "Rscript -e \"rmarkdown::render('qc/mcgill_xeva_qc.Rmd', output_file = 'mcgill_xeva_qc.html', output_dir = 'qc', knit_root_dir = getwd())\""
